@@ -74,6 +74,8 @@ class SnakeGame:
         if self.comida in self.snake:
             self._pos_comida()
 
+    def getTime(self):
+            return pygame.time.get_ticks()/1000
 
     def paso_juego(self, accion):
         self.frame_iteracion += 1
