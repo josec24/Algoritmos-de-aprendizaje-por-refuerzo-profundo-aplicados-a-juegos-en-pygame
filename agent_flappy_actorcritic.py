@@ -2,13 +2,15 @@ import torch
 import numpy as np
 from juegos.flappybird.game import FlappyBirdGame
 from modelos.model_actorcritic import ActorCritic
-# from helper import guardarPuntuacion
+from datos.helper import guardarPuntuacion
 import sys
 import torch.optim as optim
 
 #Entrenamiento del agente
 def train(game, agent, max_episodes, max_steps):
-
+    record = 0
+    score=0
+    timeP=0
 
     # Recorriendo cada episodio
     for episode in range(max_episodes):
@@ -35,7 +37,7 @@ def train(game, agent, max_episodes, max_steps):
             #Entropia para calcular la pérdida
             entropy = -np.sum(np.mean(dist) * np.log(dist))
             #Recompensa por la acción
-            reward, done, _ = game.paso_juego(action)
+            reward, done, score = game.paso_juego(action)
             #Definiendo el siguiente estado del juego
             next_state=game.get_state()
             #Guardando valores
@@ -53,8 +55,14 @@ def train(game, agent, max_episodes, max_steps):
                 agent.all_rewards.append(np.sum(rewards))
                 agent.all_lengths.append(steps)
                 agent.average_lengths.append(np.mean(agent.all_lengths[-10:]))
+                if score > record:
+                    record = score
+                    # print('record:',record)
+                    agent.actor_critic.save('flappyBird_actorC_model.pth')
+                guardarPuntuacion(score,game.getTime()-timeP,'datos_flappyBird_actorC.csv')
+                timeP=game.getTime()
                 game.reinicio()
-                print("Episodio " + str(episode) + ", recompensa: " + str(np.sum(reward)))
+                print("Episodio " + str(episode) + ", recompensa: " + str(np.sum(rewards)))
                 break
         #Obtener la perdida con los Q valores del modelo DQN y modelo objetivo DQN    
         ac_loss,Qval=agent.compute_loss(values,rewards,log_probs,Qval)
@@ -74,6 +82,11 @@ class A2cAgent:
         self.hidden_size=256
 
         self.actor_critic = ActorCritic(self.num_inputs, self.num_outputs, self.hidden_size)
+                
+        #Cargando el modelo
+        self.actor_critic.load_state_dict(torch.load("./model/flappyBird_actorC_model.pth"))
+        self.actor_critic.eval()
+        
         self.ac_optimizer = optim.Adam(self.actor_critic.parameters(), lr=learning_rate)
 
         self.all_lengths = []
@@ -109,9 +122,9 @@ class A2cAgent:
 
 
 #Episodios máximos
-MAX_EPISODES = 1000
+MAX_EPISODES = 100000
 #Pasos máximos
-MAX_STEPS = 1000
+MAX_STEPS = 100000
 
 #Entorno(juego)
 env = FlappyBirdGame()

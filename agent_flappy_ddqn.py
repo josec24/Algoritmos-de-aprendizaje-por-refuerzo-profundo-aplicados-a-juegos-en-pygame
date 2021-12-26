@@ -4,7 +4,7 @@ import numpy as np
 from collections import deque
 from juegos.flappybird.game import FlappyBirdGame
 from modelos.model_ddqn import DQN
-# from helper import guardarPuntuacion
+from datos.helper import guardarPuntuacion
 import torch.nn.functional as F
 
 class BasicBuffer:
@@ -44,9 +44,10 @@ class BasicBuffer:
 def train(game, agent, max_episodes, max_steps, batch_size):
     #recompensas
     episode_rewards = []
-
-    #Defino el juego evaluado
-    game = FlappyBirdGame()
+    record = 0
+    score=0
+    timeP=0
+    
 
     # Recorriendo cada episodio
     for episode in range(max_episodes):
@@ -62,7 +63,7 @@ def train(game, agent, max_episodes, max_steps, batch_size):
             #Acción del agente
             action = agent.get_action(state)
             #Recompensa por la acción
-            reward, done, _ = game.paso_juego(action)
+            reward, done, score = game.paso_juego(action)
             #Definiendo el siguiente estado del juego
             next_state=game.get_state()
             #Agregar la experiencia para que la recuerde
@@ -78,6 +79,15 @@ def train(game, agent, max_episodes, max_steps, batch_size):
             if done or step == max_steps-1:
                 #Se guarda la recompensa total obtenida en el episodio
                 episode_rewards.append(episode_reward)
+                print('score:',score)
+                if score > record:
+                    record = score
+                    # print('record:',record)
+                    agent.model.save('flappyBird_ddqn_model.pth')
+                    agent.target_model.save('flappyBird_ddqn_target_model.pth')
+                
+                guardarPuntuacion(score,game.getTime()-timeP,'datos_flappyBird_ddqn.csv')
+                timeP=game.getTime()
                 print("Episodio " + str(episode) + ", recompensa: " + str(episode_reward))
                 break
 
@@ -101,6 +111,12 @@ class DDQNAgent:
         #Modelo objetivo DQN
         self.target_model = DQN(self.num_inputs, self.num_actions,self.hidden_size)
         
+        # Cargando el modelo
+        self.model.load_state_dict(torch.load("./model/flappyBird_ddqn_model.pth"))
+        self.model.eval()
+        self.target_model.load_state_dict(torch.load("./model/flappyBird_ddqn_target_model.pth"))
+        self.target_model.eval()
+
         # Copiando los parámetros
         for target_param, param in zip(self.model.parameters(), self.target_model.parameters()):
             target_param.data.copy_(param)
@@ -157,9 +173,9 @@ class DDQNAgent:
             target_param.data.copy_(self.tau * param + (1 - self.tau) * target_param)
 
 #Episodios máximos
-MAX_EPISODES = 1000
+MAX_EPISODES = 100000
 #Pasos máximos
-MAX_STEPS = 1000
+MAX_STEPS = 100000
 #Tamaño del batch
 BATCH_SIZE = 1000
 
